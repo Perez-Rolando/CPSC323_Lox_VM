@@ -1,0 +1,42 @@
+//Virtual Machine the Execution Engine
+//Made to execute the bytecode using a stack based architecture using fetch decode execute
+#ifndef clox_vm_h
+#define clox_vm_h
+
+#include "chunk.h"
+#include "value.h"
+
+#define STACK_MAX 256
+
+//The Virtual Machine State is made up of:
+// -chunk:     The bytecode being executed
+// - ip:       Instruction Pointer (points to next instruction to execute)
+// - stack:    The value stack for operands
+// - stackTop: Points to the next empty slot in the stack
+
+typedef struct {
+    Chunk* chunk;           // The chunk of bytecode executing
+    uint8_t* ip;            // Instruction pointer (points to next byte to execute)
+    Value stack[STACK_MAX]; // The value stack
+    Value* stackTop;        // Points just past the last used stack slot
+} VM;
+
+//InnterpretResult returns the code for interperitation
+typedef enum {
+    INTERPRET_OK,
+    INTERPRET_COMPILE_ERROR,
+    INTERPRET_RUNTIME_ERROR
+} InterpretResult;
+
+//initVM is used to initialize the VM which is called before using the actual VM
+void initVM();
+
+//freeVM is used to free all the resources that are being used by the VM
+void freeVM();
+
+InterpretResult interpret(Chunk* chunk); //Interpreting a chunk of bytecode
+
+void push(Value value);//Pushing a value onto the stack
+Value pop();           //popping a value off the stack
+
+#endif

@@ -13,6 +13,11 @@
 typedef enum {
     OP_CONSTANT,    // Load a constant from the constant pool
     OP_RETURN,      // Return from the current function
+    OP_ADD,
+    OP_SUBTRACT,
+    OP_MULTIPLY,
+    OP_DIVIDE,
+    OP_NEGATE,
 } OpCode;
 
 // Chunk - The Dynamic array of bytecode
