@@ -1,5 +1,5 @@
 //Virtual Machine the Execution Engine
-//Made to execute the bytecode using a stack based architecture using fetch decode execute
+//Made to execute the bytecode using a stack based architecture using "fetch-decode-execute" cycle
 #ifndef clox_vm_h
 #define clox_vm_h
 
@@ -34,7 +34,7 @@ void initVM();
 //freeVM is used to free all the resources that are being used by the VM
 void freeVM();
 
-InterpretResult interpret(Chunk* chunk); //Interpreting a chunk of bytecode
+InterpretResult interpret(const char* source); //Interpreting a chunk of bytecode
 
 void push(Value value);//Pushing a value onto the stack
 Value pop();           //popping a value off the stack
