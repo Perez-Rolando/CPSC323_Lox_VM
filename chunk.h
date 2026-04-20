@@ -18,6 +18,11 @@ typedef enum {
     OP_MULTIPLY,
     OP_DIVIDE,
     OP_NEGATE,
+    OP_NIL,
+    OP_TRUE,
+    OP_FALSE,
+    OP_NOT,
+
 } OpCode;
 
 // Chunk - The Dynamic array of bytecode
