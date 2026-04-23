@@ -1,9 +1,12 @@
 //The actual Virtual Machine Implementation
 #include <cstdio>
 #include <cstdarg>
+#include <cstring> 
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
+#include "object.h"
+#include "memory.h" 
 #include "vm.h"
 
 VM vm;
@@ -14,9 +17,32 @@ static void resetStack() {  //reseting the stack to empty
 
 void initVM(){
     resetStack();
+    vm.objects = nullptr;
+}
+
+//Freeing a SINGLE object
+static void freeObject(Obj* object) {
+    switch (object->type) {
+        case OBJ_STRING: {
+            ObjString* string = (ObjString*)object;
+            FREE_ARRAY(char, string->chars, string->length + 1);
+            FREE(ObjString, object);
+            break;
+        }
+    }
+}
+//Free all heap allocated Objects
+static void freeObjects() {
+    Obj* object = vm.objects;
+    while (object != nullptr) {
+        Obj* next = object->next;
+        freeObject(object);
+        object = next;
+    }
 }
 
 void freeVM() {
+    freeObjects();
 
 }
 
@@ -59,6 +85,21 @@ static void runtimeError(const char* format, ...) {
     int line = vm.chunk->lines[instruction];
     fprintf(stderr, "[line %d] in script\n", line);
     resetStack();
+}
+
+//Concatenate two strings
+static void concatenate() {
+    ObjString* b = AS_STRING(pop());
+    ObjString* a = AS_STRING(pop());
+    
+    int length = a->length + b->length;
+    char* chars = ALLOCATE(char, length + 1);
+    memcpy(chars, a->chars, a->length);
+    memcpy(chars + a->length, b->chars, b->length);
+    chars[length] = '\0';
+    
+    ObjString* result = takeString(chars, length);
+    push(OBJ_VAL(result));
 }
 
 static InterpretResult run() {
@@ -106,7 +147,19 @@ static InterpretResult run() {
             case OP_TRUE:     push(BOOL_VAL(true)); break;
             case OP_FALSE:    push(BOOL_VAL(false)); break;
             
-            case OP_ADD:      BINARY_OP(NUMBER_VAL, +); break;
+            case OP_ADD: {
+    if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+        concatenate();
+    } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+        double b = AS_NUMBER(pop());
+        double a = AS_NUMBER(pop());
+        push(NUMBER_VAL(a + b));
+    } else {
+        runtimeError("Operands must be two numbers or two strings.");
+        return INTERPRET_RUNTIME_ERROR;
+    }
+    break;
+}
             case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
             case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
             case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, /); break;

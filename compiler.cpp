@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include "common.h"
 #include "compiler.h"
+#include "object.h" 
 #include "scanner.h"
 
 #ifdef DEBUG_PRINT_CODE
@@ -195,6 +196,13 @@ static void unary() {
     }
 }
 
+//Parse a single literal
+static void string() {
+    // +1 and -2 to trim the leading and trailing quotes
+    emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
+                                    parser.previous.length - 2)));
+}
+
 //The Parse table maps token types to parse functions and is used for Pratt Parsing
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN]    = {grouping, nullptr,   PREC_NONE},
@@ -217,7 +225,7 @@ ParseRule rules[] = {
     [TOKEN_LESS]          = {nullptr,     nullptr,   PREC_NONE},
     [TOKEN_LESS_EQUAL]    = {nullptr,     nullptr,   PREC_NONE},
     [TOKEN_IDENTIFIER]    = {nullptr,     nullptr,   PREC_NONE},
-    [TOKEN_STRING]        = {nullptr,     nullptr,   PREC_NONE},
+    [TOKEN_STRING]        = {string,  nullptr,   PREC_NONE},
     [TOKEN_NUMBER]        = {number,   nullptr,   PREC_NONE},
     [TOKEN_AND]           = {nullptr,     nullptr,   PREC_NONE},
     [TOKEN_CLASS]         = {nullptr,     nullptr,   PREC_NONE},

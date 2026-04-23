@@ -1,7 +1,10 @@
 //This will be the Value Implemintation
 #include <cstdio>
 #include <cstdarg>
+#include <cstring>
+#include "object.h"
 #include "memory.h"
+#include "value.h"
 #include "compiler.h"
 #include "debug.h"
 #include "vm.h"
@@ -40,6 +43,9 @@ void printValue(Value value) {
         case VAL_NUMBER:
             printf("%g", AS_NUMBER(value));
             break;
+        case VAL_OBJ:
+            printObject(value);
+            break;
     }
 }
 
@@ -52,6 +58,13 @@ bool valuesEqual(Value a, Value b) {
         case VAL_BOOL:   return AS_BOOL(a) == AS_BOOL(b);
         case VAL_NIL:    return true;  // nil is always equal to nil
         case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-        default:         return false; // Unreachable
+        case VAL_OBJ: {
+            // String interning will make this much faster in Chapter 20
+            ObjString* aString = AS_STRING(a);
+            ObjString* bString = AS_STRING(b);
+            return aString->length == bString->length &&
+                   memcmp(aString->chars, bString->chars, aString->length) == 0;
+        }
+        default:         return false;
     }
 }

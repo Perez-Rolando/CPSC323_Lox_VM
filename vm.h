@@ -19,6 +19,7 @@ typedef struct {
     uint8_t* ip;            // Instruction pointer (points to next byte to execute)
     Value stack[STACK_MAX]; // The value stack
     Value* stackTop;        // Points just past the last used stack slot
+    Obj* objects;
 } VM;
 
 //InnterpretResult returns the code for interperitation
@@ -27,6 +28,9 @@ typedef enum {
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR
 } InterpretResult;
+
+// Make VM global accessible for object allocation
+extern VM vm;
 
 //initVM is used to initialize the VM which is called before using the actual VM
 void initVM();

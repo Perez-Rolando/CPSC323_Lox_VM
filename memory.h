@@ -5,6 +5,13 @@
 
 #include "common.h"
 
+//Allocating Memory for count items of type
+#define ALLOCATE(type, count) \
+    (type*)reallocate(nullptr, 0, sizeof(type) * (count))
+
+//FREE a single Item
+#define FREE(type, pointer) reallocate(pointer, sizeof(type), 0)
+
 //GROW_CAPACITY calculates the new capacity for a growing array 
 // THE STRAT USED: Start @8 and double each time from there
 #define GROW_CAPACITY(capacity) \
