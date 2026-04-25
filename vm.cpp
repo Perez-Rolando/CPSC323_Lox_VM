@@ -6,7 +6,8 @@
 #include "compiler.h"
 #include "debug.h"
 #include "object.h"
-#include "memory.h" 
+#include "memory.h"
+#include "table.h" 
 #include "vm.h"
 
 VM vm;
@@ -18,6 +19,7 @@ static void resetStack() {  //reseting the stack to empty
 void initVM(){
     resetStack();
     vm.objects = nullptr;
+    initTable(&vm.strings);
 }
 
 //Freeing a SINGLE object
@@ -42,6 +44,7 @@ static void freeObjects() {
 }
 
 void freeVM() {
+    freeTable(&vm.strings);
     freeObjects();
 
 }
