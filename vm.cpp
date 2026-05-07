@@ -20,6 +20,7 @@ void initVM(){
     resetStack();
     vm.objects = nullptr;
     initTable(&vm.strings);
+    initTable(&vm.globals);
 }
 
 //Freeing a SINGLE object
@@ -45,6 +46,7 @@ static void freeObjects() {
 
 void freeVM() {
     freeTable(&vm.strings);
+    freeTable(&vm.globals);
     freeObjects();
 
 }
@@ -149,6 +151,43 @@ static InterpretResult run() {
             case OP_NIL:      push(NIL_VAL); break;
             case OP_TRUE:     push(BOOL_VAL(true)); break;
             case OP_FALSE:    push(BOOL_VAL(false)); break;
+            case OP_PRINT: {
+    printValue(pop());
+    printf("\n");
+    break;
+}
+
+case OP_POP:
+    pop();
+    break;
+
+case OP_DEFINE_GLOBAL: {
+    ObjString* name = AS_STRING(READ_CONSTANT());
+    tableSet(&vm.globals, name, peek(0));
+    pop();
+    break;
+}
+
+case OP_GET_GLOBAL: {
+    ObjString* name = AS_STRING(READ_CONSTANT());
+    Value value;
+    if (!tableGet(&vm.globals, name, &value)) {
+        runtimeError("Undefined variable '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+    }
+    push(value);
+    break;
+}
+
+case OP_SET_GLOBAL: {
+    ObjString* name = AS_STRING(READ_CONSTANT());
+    if (tableSet(&vm.globals, name, peek(0))) {
+        tableDelete(&vm.globals, name);
+        runtimeError("Undefined variable '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+    }
+    break;
+}
             
             case OP_ADD: {
     if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
@@ -180,10 +219,9 @@ static InterpretResult run() {
                 break;
             
             case OP_RETURN: {
-                printValue(pop());
-                printf("\n");
+                // Exit interpreter
                 return INTERPRET_OK;
-            }
+}
         }
     }
     

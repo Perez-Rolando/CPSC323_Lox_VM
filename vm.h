@@ -20,6 +20,7 @@ typedef struct {
     uint8_t* ip;            // Instruction pointer (points to next byte to execute)
     Value stack[STACK_MAX]; // The value stack
     Value* stackTop;        // Points just past the last used stack slot
+    Table globals;
     Table strings;
     Obj* objects;
 } VM;

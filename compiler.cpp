@@ -1,4 +1,4 @@
- //Single-pass compiler using Pratt parsing (precedence climbing).
+//Single-pass compiler using Pratt parsing (precedence climbing).
 #include <cstdio>
 #include <cstdlib>
 #include "common.h"
@@ -34,7 +34,7 @@ typedef enum {
 } Precedence;
 
 //Function pointer type for parse functions
-typedef void (*ParseFn)();
+typedef void (*ParseFn)(bool canAssign);
 
 //ParseRule - Defines how to parse each token type
 typedef struct {
@@ -46,6 +46,19 @@ typedef struct {
 // Global parser and compiler state
 Parser parser;
 Chunk* compilingChunk;
+
+// Forward declarations
+static void expression();
+static void statement();
+static void declaration();
+static ParseRule* getRule(TokenType type);
+static void parsePrecedence(Precedence precedence);
+static uint8_t identifierConstant(Token* name);
+static uint8_t parseVariable(const char* errorMessage);
+static void defineVariable(uint8_t global);
+static bool match(TokenType type);
+static bool check(TokenType type);
+static void synchronize();
 
 //Get the chunk currently being compiled
 static Chunk* currentChunk() {
@@ -129,6 +142,10 @@ static void emitConstant(Value value) {
     emitBytes(OP_CONSTANT, makeConstant(value));
 }
 
+static uint8_t identifierConstant(Token* name) {
+    return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
+}
+
 //THE END compilation
 static void endCompiler() {
     emitReturn();
@@ -139,13 +156,8 @@ static void endCompiler() {
 #endif
 }
 
-// Forward declarations for recursive parser functions
-static void expression();
-static ParseRule* getRule(TokenType type);
-static void parsePrecedence(Precedence precedence);
-
 //Parsing a binary operator
-static void binary() {
+static void binary(bool canAssign) {
     TokenType operatorType = parser.previous.type;
     ParseRule* rule = getRule(operatorType);
     parsePrecedence((Precedence)(rule->precedence + 1));
@@ -160,19 +172,19 @@ static void binary() {
 }
 
 //Parsing a grouped expression
-static void grouping() {
+static void grouping(bool canAssign) {
     expression();
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
 //Parsing a number literal
-static void number() {
+static void number(bool canAssign) {
     double value = strtod(parser.previous.start, nullptr);
     emitConstant(NUMBER_VAL(value));
 }
 
 //Parsing a literal (true, false, nil)
-static void literal() {
+static void literal(bool canAssign) {
     switch (parser.previous.type) {
         case TOKEN_FALSE: emitByte(OP_FALSE); break;
         case TOKEN_NIL:   emitByte(OP_NIL); break;
@@ -182,7 +194,7 @@ static void literal() {
 }
 
 //Parsing a Unary operator
-static void unary() {
+static void unary(bool canAssign) {
     TokenType operatorType = parser.previous.type;
     
     // Compile the operand
@@ -196,11 +208,123 @@ static void unary() {
     }
 }
 
-//Parse a single literal
-static void string() {
+//Parse a string literal
+static void string(bool canAssign) {
     // +1 and -2 to trim the leading and trailing quotes
     emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
                                     parser.previous.length - 2)));
+}
+
+//Parse a variable declaration
+static void varDeclaration() {
+    uint8_t global = parseVariable("Expect variable name.");
+    
+    if (match(TOKEN_EQUAL)) {
+        expression();
+    } else {
+        emitByte(OP_NIL);
+    }
+    consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
+    
+    defineVariable(global);
+}
+
+//Parse a variable name
+static uint8_t parseVariable(const char* errorMessage) {
+    consume(TOKEN_IDENTIFIER, errorMessage);
+    return identifierConstant(&parser.previous);
+}
+
+//Define a global variable
+static void defineVariable(uint8_t global) {
+    emitBytes(OP_DEFINE_GLOBAL, global);
+}
+
+//Parse an expression statement
+static void expressionStatement() {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    emitByte(OP_POP);
+}
+
+//Parse a print statement
+static void printStatement() {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expect ';' after value.");
+    emitByte(OP_PRINT);
+}
+
+//Parse a statement
+static void statement() {
+    if (match(TOKEN_PRINT)) {
+        printStatement();
+    } else {
+        expressionStatement();
+    }
+}
+
+//Parse a declaration
+static void declaration() {
+    if (match(TOKEN_VAR)) {
+        varDeclaration();
+    } else {
+        statement();
+    }
+    
+    if (parser.panicMode) synchronize();
+}
+
+//Synchronize after a parse error
+static void synchronize() {
+    parser.panicMode = false;
+    
+    while (parser.current.type != TOKEN_EOF) {
+        if (parser.previous.type == TOKEN_SEMICOLON) return;
+        switch (parser.current.type) {
+            case TOKEN_CLASS:
+            case TOKEN_FUN:
+            case TOKEN_VAR:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_PRINT:
+            case TOKEN_RETURN:
+                return;
+            default:
+                ; // Do nothing
+        }
+        
+        advance();
+    }
+}
+
+//Check if current token matches any of the given types
+static bool match(TokenType type) {
+    if (!check(type)) return false;
+    advance();
+    return true;
+}
+
+//Check if current token is of given type
+static bool check(TokenType type) {
+    return parser.current.type == type;
+}
+
+//Parse a variable reference or assignment
+static void namedVariable(Token name, bool canAssign) {
+    uint8_t arg = identifierConstant(&name);
+    
+    if (canAssign && match(TOKEN_EQUAL)) {
+        expression();
+        emitBytes(OP_SET_GLOBAL, arg);
+    } else {
+        emitBytes(OP_GET_GLOBAL, arg);
+    }
+}
+
+//Parse an identifier (variable reference)
+static void variable(bool canAssign) {
+    namedVariable(parser.previous, canAssign);
 }
 
 //The Parse table maps token types to parse functions and is used for Pratt Parsing
@@ -224,7 +348,7 @@ ParseRule rules[] = {
     [TOKEN_GREATER_EQUAL] = {nullptr,     nullptr,   PREC_NONE},
     [TOKEN_LESS]          = {nullptr,     nullptr,   PREC_NONE},
     [TOKEN_LESS_EQUAL]    = {nullptr,     nullptr,   PREC_NONE},
-    [TOKEN_IDENTIFIER]    = {nullptr,     nullptr,   PREC_NONE},
+    [TOKEN_IDENTIFIER]    = {variable, nullptr,   PREC_NONE},
     [TOKEN_STRING]        = {string,  nullptr,   PREC_NONE},
     [TOKEN_NUMBER]        = {number,   nullptr,   PREC_NONE},
     [TOKEN_AND]           = {nullptr,     nullptr,   PREC_NONE},
@@ -247,9 +371,7 @@ ParseRule rules[] = {
     [TOKEN_EOF]           = {nullptr,     nullptr,   PREC_NONE},
 };
 
-//Parse an expression at the given precedence level
-//This is Pratt parsing
-
+//Parse an expression at the given precedence level (Pratt parsing)
 static void parsePrecedence(Precedence precedence) {
     advance();
     ParseFn prefixRule = getRule(parser.previous.type)->prefix;
@@ -258,12 +380,17 @@ static void parsePrecedence(Precedence precedence) {
         return;
     }
     
-    prefixRule();
+    bool canAssign = precedence <= PREC_ASSIGNMENT;
+    prefixRule(canAssign);
     
     while (precedence <= getRule(parser.current.type)->precedence) {
         advance();
         ParseFn infixRule = getRule(parser.previous.type)->infix;
-        infixRule();
+        infixRule(false);
+    }
+    
+    if (canAssign && match(TOKEN_EQUAL)) {
+        error("Invalid assignment target.");
     }
 }
 
@@ -286,8 +413,11 @@ bool compile(const char* source, Chunk* chunk) {
     parser.panicMode = false;
     
     advance();
-    expression();
-    consume(TOKEN_EOF, "Expect end of expression.");
+    
+    while (!match(TOKEN_EOF)) {
+        declaration();
+    }
+    
     endCompiler();
     return !parser.hadError;
 }
