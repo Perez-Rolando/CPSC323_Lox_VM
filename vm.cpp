@@ -188,6 +188,18 @@ case OP_SET_GLOBAL: {
     }
     break;
 }
+
+case OP_GET_LOCAL: {
+    uint8_t slot = READ_BYTE();
+    push(vm.stack[slot]);
+    break;
+}
+
+case OP_SET_LOCAL: {
+    uint8_t slot = READ_BYTE();
+    vm.stack[slot] = peek(0);
+    break;
+}
             
             case OP_ADD: {
     if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {

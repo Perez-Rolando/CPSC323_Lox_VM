@@ -10,4 +10,6 @@
 using uint8_t = std::uint8_t;
 using size_t = std::size_t;
 
+#define UINT8_COUNT (UINT8_MAX + 1)
+
 #endif
